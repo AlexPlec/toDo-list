@@ -94,7 +94,7 @@ export default {
     const removeTask = index => {
       tasks.value.splice(index, 1);
     };
-////
+
     const setFilter = filterValue => {
       filter.value = filterValue;
     };
