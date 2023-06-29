@@ -11,7 +11,7 @@
         <ul class="task-list">
           <li v-for="(task, index) in filteredTasks" :key="index" :class="{ completed: task.completed }">
             <div class="task">
-              <span class="task-text" @click="toggleTaskCompletion(index)">{{ task.text }}</span>
+              <span class="task-text" @click="toggleTaskCompletion(index)">{{ task.description }}</span>
               <button class="btn-task" @click="editTask(index)">Edit</button>
               <button class="btn-task" @click="removeTask(index)">Remove</button>
             </div>
@@ -34,21 +34,34 @@
 </template>
 
 <script>
-import { ref, computed, reactive } from 'vue';
+import { ref, computed, reactive,onMounted  } from 'vue';
+import axios from 'axios';
+
 
 export default {
   name: 'App',
   setup() {
-    const tasks = ref([
-      { text: 'Task 1', completed: false },
-      { text: 'Task 2', completed: true },
-      { text: 'Task 3', completed: false },
-    ]);
+    const tasks = reactive([]); // Update ref to reactive
     const newTask = ref('');
     const filter = ref('all');
     const showEditModal = ref(false);
     const editedTask = reactive({});
-    const selectedTaskIndex = ref(null); // New variable to store the selected task index
+    const selectedTaskIndex = ref(null);
+
+      // Fetch tasks from the server
+      const fetchTasks = () => {
+  axios.get('http://localhost:5204/api/tasks')
+    .then(response => {
+      tasks.value = response.data;
+    })
+    .catch(error => {
+      console.error('Error fetching tasks:', error);
+    });
+};
+
+
+      // Call the fetchTasks function on component mount
+      onMounted(fetchTasks);
 
     const filteredTasks = computed(() => {
       if (filter.value === 'active') {
@@ -61,11 +74,38 @@ export default {
     });
 
     const addTask = () => {
-      if (newTask.value) {
-        tasks.value.push({ text: newTask.value, completed: false });
-        newTask.value = '';
-      }
+
+  if (newTask.value && newTask.value.trim() !== '') {
+    const taskData = {
+      Description: newTask.value,
+      completed: false
     };
+    axios.post('http://localhost:5204/api/tasks', taskData)
+
+      .then(response => {
+        console.log('Task sent successfully');
+        fetchTasks();
+        // You can optionally handle the response here
+      })
+      .catch(error => {
+        console.error('Error sending task:', error);
+      });
+
+    newTask.value = '';
+
+  }
+};
+
+const updateTodoList = () => {
+  axios.get('http://localhost:5204/api/tasks')
+    .then(response => {
+
+      tasks.value = response.data;
+    })
+    .catch(error => {
+      console.error('Error fetching tasks:', error);
+    });
+};
 
     const toggleTaskCompletion = index => {
       tasks.value[index].completed = !tasks.value[index].completed;
@@ -73,17 +113,32 @@ export default {
 
     const editTask = index => {
       selectedTaskIndex.value = index;
-      editedTask.text = tasks.value[index].text;
+      editedTask.text = tasks.value[index].Description;
       showEditModal.value = true;
     };
 
     const saveEditedTask = () => {
-      if (selectedTaskIndex.value !== null) {
-        tasks.value[selectedTaskIndex.value].text = editedTask.text;
-        showEditModal.value = false;
-        selectedTaskIndex.value = null;
-      }
+  if (selectedTaskIndex.value !== null) {
+    const taskId = tasks.value[selectedTaskIndex.value].id;
+    const updatedTask = {
+      Description: editedTask.text,
+      completed: tasks.value[selectedTaskIndex.value].completed,
     };
+
+    axios.put(`http://localhost:5204/api/tasks/${taskId}`, updatedTask)
+      .then(response => {
+        console.log('Task updated successfully');
+        fetchTasks(); // Update the todo list after editing the task
+        // You can optionally handle the response here
+      })
+      .catch(error => {
+        console.error('Error updating task:', error);
+      });
+
+    showEditModal.value = false;
+    selectedTaskIndex.value = null;
+  }
+};
 
     const cancelEdit = () => {
       editedTask.text = '';
@@ -92,8 +147,19 @@ export default {
     };
 
     const removeTask = index => {
-      tasks.value.splice(index, 1);
-    };
+  const taskId = tasks.value[index].id;
+
+  axios.delete(`http://localhost:5204/api/tasks/${taskId}`)
+    .then(response => {
+      console.log('Task removed successfully');
+      // Optionally handle the response here
+    })
+    .catch(error => {
+      console.error('Error removing task:', error);
+    });
+
+  tasks.value.splice(index, 1);
+};
 
     const setFilter = filterValue => {
       filter.value = filterValue;
